@@ -4,6 +4,8 @@ use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 
 mod chunking;
 mod parsing;
+mod embedding;
+mod chunk_writter;
 
 pub fn scan_repo(repo_path: String) {
     let meta_files = parsing::parse_repo(repo_path);
