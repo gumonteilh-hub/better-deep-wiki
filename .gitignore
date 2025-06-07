@@ -1,2 +1,5 @@
 /target
-/clone
+/clone/*
+*chunks.bin
+vector_db
+.env

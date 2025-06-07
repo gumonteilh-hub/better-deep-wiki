@@ -3,7 +3,7 @@ use std::fs;
 use std::path::Path;
 
 const CODE_EXTENSIONS: &[&str] = &[
-    "rs", "py", "js", "ts", "java", "cpp", "c", "go", "rb", "php", "cs",
+    "rs", "py", "js", "ts", "tsx", "jsx", "java", "cpp", "c", "go", "rb", "php", "cs",
 ];
 const DOC_EXTENSIONS: &[&str] = &["md", "markdown", "rst", "txt", "adoc", "org"];
 
