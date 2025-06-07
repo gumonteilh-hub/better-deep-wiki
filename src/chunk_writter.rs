@@ -1,14 +1,9 @@
-use serde::{Deserialize, Serialize};
+use crate::types::Chunk;
+use bincode::Decode;
+use bincode::error::EncodeError;
 use std::fs::{File, OpenOptions};
-use std::io::{BufWriter, Write};
+use std::io::{BufWriter, ErrorKind, Write};
 use std::sync::{Arc, Mutex};
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct Chunk {
-    pub path: String,
-    pub index: usize,
-    pub text: String,
-}
 
 pub struct ChunkBinWriter {
     inner: Arc<Mutex<BufWriter<File>>>,
@@ -24,9 +19,16 @@ impl ChunkBinWriter {
     pub fn arc(self) -> Arc<Self> {
         Arc::new(self)
     }
-    pub fn write(&self, chunk: &Chunk) -> bincode::Result<()> {
+
+    pub fn write(&self, chunk: &Chunk) -> Result<(), EncodeError> {
         let mut writer = self.inner.lock().unwrap();
-        bincode::serialize_into(&mut *writer, chunk)
+        // v2 : encode_into_std_write
+        bincode::encode_into_std_write::<Chunk, _, _>(
+            chunk.clone(),
+            &mut *writer,
+            bincode::config::standard(),
+        )
+        .map(|_| ())
     }
     pub fn flush(&self) -> std::io::Result<()> {
         let mut writer = self.inner.lock().unwrap();
@@ -37,6 +39,37 @@ impl ChunkBinWriter {
 unsafe impl Send for ChunkBinWriter {}
 unsafe impl Sync for ChunkBinWriter {}
 
+use bincode::{config::standard, decode_from_std_read, error::DecodeError};
+use std::io::BufReader;
+
+pub struct ChunkBinReader<T> {
+    reader: BufReader<File>,
+    _phantom: std::marker::PhantomData<T>,
+}
+
+impl<T> ChunkBinReader<T> {
+    pub fn open(path: &str) -> std::io::Result<Self> {
+        let file = File::open(path)?;
+        Ok(Self {
+            reader: BufReader::new(file),
+            _phantom: std::marker::PhantomData,
+        })
+    }
+}
+
+impl<T: Decode<()>> Iterator for ChunkBinReader<T> {
+    type Item = Result<T, DecodeError>;
+    fn next(&mut self) -> Option<Self::Item> {
+        let config = standard();
+        match decode_from_std_read::<T, _, _>(&mut self.reader, config) {
+            Ok(val) => Some(Ok(val)),
+            Err(DecodeError::UnexpectedEnd { .. }) => None,
+            Err(DecodeError::Io { inner, .. }) if inner.kind() == ErrorKind::UnexpectedEof => None,
+            Err(e) => Some(Err(e)),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -44,8 +77,28 @@ mod tests {
     use std::thread;
 
     #[test]
-    fn test_threadsafe_chunkbin() {
-        let file_path = "test_thread_chunks.bin";
+    fn test_minimal_bincode_v2() {
+        let file_path = "test_simple.bin";
+        let _ = std::fs::remove_file(file_path);
+        let writer = ChunkBinWriter::create(file_path).unwrap();
+        let chunk = Chunk {
+            path: "a".into(),
+            chunk_index: 1,
+            chunk_end_line: 5,
+            chunk_start_line: 0,
+            text: "yo".into(),
+        };
+        writer.write(&chunk).unwrap();
+        writer.flush().unwrap();
+        let mut reader = ChunkBinReader::<Chunk>::open(file_path).unwrap();
+        let chunk2 = reader.next().unwrap().unwrap();
+        assert_eq!(chunk2.text, "yo");
+        let _ = fs::remove_file(file_path);
+    }
+
+    #[test]
+    fn test_threadsafe_chunkbin_v2_reader() {
+        let file_path = "test_thread_chunks_v2.bin";
         let _ = fs::remove_file(file_path);
         let writer = ChunkBinWriter::create(file_path).unwrap().arc();
         let handles: Vec<_> = (0..4)
@@ -55,7 +108,9 @@ mod tests {
                     for i in 0..10 {
                         let chunk = Chunk {
                             path: format!("/th{}_{}.rs", t, i),
-                            index: i,
+                            chunk_index: i,
+                            chunk_end_line: 5,
+                            chunk_start_line: 0,
                             text: format!("x = {}", i),
                         };
                         writer.write(&chunk).unwrap();
@@ -67,11 +122,16 @@ mod tests {
             h.join().unwrap();
         }
         writer.flush().unwrap();
-        // Relire pour vérifier
-        let reader = std::fs::File::open(file_path).unwrap();
-        let count = bincode::de::Deserializer::from_reader(reader)
-            .into_iter::<Chunk>()
-            .count();
-        assert_eq!(count, 40);
+
+        // Use the new ChunkBinReader for streaming read
+        let reader = ChunkBinReader::<Chunk>::open(file_path).unwrap();
+        let items: Vec<Chunk> = reader
+            .map(|r| match r {
+                Ok(chunk) => chunk,
+                Err(e) => panic!("Erreur bincode: {e:?}"),
+            })
+            .collect();
+        assert_eq!(items.len(), 40);
+        let _ = fs::remove_file(file_path);
     }
 }

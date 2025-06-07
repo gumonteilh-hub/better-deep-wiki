@@ -5,16 +5,15 @@ use std::fmt;
 
 use tiktoken_rs::cl100k_base;
 
-const MAX_BATCH_SIZE: usize = 128;
-const MAX_TOTAL_TOKENS: usize = 16384;
-const MAX_SEQUENCE_LENGTH: usize = 8192;
+use crate::types::{Chunk, Embedding};
+use crate::utils::MAX_SEQUENCE_LENGTH;
 
-pub type Embedding = Vec<f32>;
+pub type EmbeddingVector = Vec<f32>;
 
 #[derive(Debug)]
 pub struct EmbedResult {
     pub input: Vec<String>,
-    pub embeddings: Option<Vec<Embedding>>,
+    pub embeddings: Option<Vec<EmbeddingVector>>,
     pub error: Option<String>,
 }
 
@@ -46,41 +45,9 @@ fn truncate_to_max_tokens(text: &str, max_tokens: usize) -> String {
     }
 }
 
-fn make_batches(texts: &[String]) -> Vec<Vec<String>> {
-    let mut batches = Vec::new();
-    let mut current_batch = Vec::new();
-    let mut current_batch_tokens = 0;
-    let enc = cl100k_base().expect("error instantiation tiktoken_rs");
-    for text in texts {
-        let tokens = enc.encode_ordinary(text);
-        let t = if tokens.len() > MAX_SEQUENCE_LENGTH {
-            enc.decode(tokens[..MAX_SEQUENCE_LENGTH].to_vec())
-                .unwrap_or_default()
-        } else {
-            text.clone()
-        };
-        let n_tokens = enc.encode_ordinary(&t).len();
-        if current_batch.len() >= MAX_BATCH_SIZE
-            || current_batch_tokens + n_tokens > MAX_TOTAL_TOKENS
-        {
-            if !current_batch.is_empty() {
-                batches.push(current_batch);
-                current_batch = Vec::new();
-                current_batch_tokens = 0;
-            }
-        }
-        current_batch.push(t);
-        current_batch_tokens += n_tokens;
-    }
-    if !current_batch.is_empty() {
-        batches.push(current_batch);
-    }
-    batches
-}
-
 #[async_trait::async_trait]
 pub trait Embedder {
-    async fn embed_batch(&self, inputs: &[String]) -> Result<Vec<Embedding>, String>;
+    async fn embed_batch(&self, inputs: Vec<Chunk>) -> Result<Vec<Embedding>, String>;
 }
 
 pub struct MistralEmbedder {
@@ -94,7 +61,7 @@ pub struct MistralEmbedder {
 #[derive(Serialize)]
 struct MistralEmbeddingRequest<'a> {
     model: &'a str,
-    inputs: &'a [String],
+    input: &'a [String],
 }
 
 #[derive(Deserialize)]
@@ -107,12 +74,45 @@ struct MistralEmbeddingData {
     embedding: Vec<f32>,
 }
 
+impl MistralEmbedder {
+    pub fn from_env(dim: usize) -> Self {
+        let api_key = std::env::var("MISTRAL_API_KEY").expect("MISTRAL_API_KEY must be set");
+        let endpoint = std::env::var("MISTRAL_ENDPOINT")
+            .unwrap_or_else(|_| "https://api.mistral.ai/v1/embeddings".to_string());
+        let model =
+            std::env::var("MISTRAL_MODEL").unwrap_or_else(|_| "codestral-embed".to_string());
+
+        let client = Client::new();
+
+        Self {
+            dim,
+            api_key,
+            endpoint,
+            model,
+            client,
+        }
+    }
+}
+
 #[async_trait::async_trait]
 impl Embedder for MistralEmbedder {
-    async fn embed_batch(&self, inputs: &[String]) -> Result<Vec<Embedding>, String> {
+    async fn embed_batch(&self, inputs: Vec<Chunk>) -> Result<Vec<Embedding>, String> {
+        let text_inputs: Vec<_> = inputs
+            .iter()
+            .map(|c| c.clone().text)
+            .filter(|s| {
+                !s.trim().is_empty()
+                    && s.len() <= MAX_SEQUENCE_LENGTH
+                    && s.is_char_boundary(s.len())
+            })
+            .collect();
+        if text_inputs.is_empty() {
+            let paths: Vec<_> = inputs.iter().map(|c| &c.path).collect();
+            return Err(format!("Empty input batch for files: {:?}", paths));
+        }
         let req_body = MistralEmbeddingRequest {
             model: &self.model,
-            inputs,
+            input: &text_inputs,
         };
         let res = self
             .client
@@ -124,7 +124,15 @@ impl Embedder for MistralEmbedder {
             .await
             .map_err(|e| format!("HTTP error: {e}"))?;
         if !res.status().is_success() {
-            return Err(format!("Mistral API error: status {}", res.status()));
+            let status = res.status();
+            let body = res
+                .text()
+                .await
+                .unwrap_or_else(|e| format!("(error reading body: {e})"));
+            return Err(format!(
+                "Mistral API error: status {} — body: {}",
+                status, body
+            ));
         }
         let parsed: MistralEmbeddingResponse = res
             .json()
@@ -137,31 +145,18 @@ impl Embedder for MistralEmbedder {
                 inputs.len()
             ));
         }
-        Ok(parsed.data.into_iter().map(|d| d.embedding).collect())
-    }
-}
+        let mut result = Vec::new();
 
-pub async fn embed_all<E: Embedder + Sync + Send>(embedder: &E, texts: Vec<String>) -> EmbedResult {
-    let mut all_embeddings = Vec::new();
-    let batches = make_batches(&texts);
-    for batch in batches {
-        match embedder.embed_batch(&batch).await {
-            Ok(embs) => {
-                all_embeddings.extend(embs);
-            }
-            Err(e) => {
-                all_embeddings.extend((0..batch.len()).map(|_| Vec::new()));
-                return EmbedResult {
-                    input: texts,
-                    embeddings: Some(all_embeddings),
-                    error: Some(format!("Erreur embedding batch : {e}")),
-                };
-            }
+        for (index, data) in parsed.data.into_iter().enumerate() {
+            result.push(Embedding::new(
+                inputs[index].path.clone(),
+                inputs[index].chunk_index,
+                inputs[index].chunk_start_line,
+                inputs[index].chunk_end_line,
+                data.embedding,
+            ));
         }
-    }
-    EmbedResult {
-        input: texts,
-        embeddings: Some(all_embeddings),
-        error: None,
+
+        Ok(result)
     }
 }

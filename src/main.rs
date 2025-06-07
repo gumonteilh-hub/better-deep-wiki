@@ -9,6 +9,7 @@ struct Args {
 }
 fn main() {
     let args = Args::parse();
+    dotenvy::dotenv().ok();
     println!("Chemin à traiter : {}", args.path);
     better_deep_wiki::scan_repo(args.path);
 }
