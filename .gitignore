@@ -3,3 +3,5 @@
 *chunks.bin
 vector_db
 .env
+qdrant_data
+generated/

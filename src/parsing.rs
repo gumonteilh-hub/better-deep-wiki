@@ -1,5 +1,4 @@
 use ignore::Walk;
-use std::fs;
 use std::path::Path;
 
 const CODE_EXTENSIONS: &[&str] = &[
@@ -7,7 +6,7 @@ const CODE_EXTENSIONS: &[&str] = &[
 ];
 const DOC_EXTENSIONS: &[&str] = &["md", "markdown", "rst", "txt", "adoc", "org"];
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum FileType {
     Code,
     Doc,
@@ -17,8 +16,6 @@ pub enum FileType {
 #[derive(Debug)]
 pub struct FileMeta {
     pub path: String,
-    pub file_type: FileType,
-    pub token_count: usize,
 }
 
 fn detect_file_type(path: &Path) -> FileType {
@@ -33,11 +30,6 @@ fn detect_file_type(path: &Path) -> FileType {
     FileType::Other
 }
 
-fn estimate_token_count(text: &str) -> usize {
-    // TODO: Remplace par tiktoken-rs si besoin de précision
-    text.split_whitespace().count()
-}
-
 pub fn parse_repo(path: String) -> Vec<FileMeta> {
     let mut results = Vec::new();
 
@@ -48,30 +40,15 @@ pub fn parse_repo(path: String) -> Vec<FileMeta> {
         };
 
         let path = entry.path();
-        // Tente de lire le fichier en texte (skip binaires)
-        let content = match fs::read_to_string(path) {
-            Ok(c) => c,
-            Err(_) => continue,
-        };
-
-        // 2) Type
         let file_type = detect_file_type(path);
 
-        // 3) A-t-on envie de process ce type ?
-        if let FileType::Other = file_type {
+        if file_type != FileType::Code {
             continue;
         }
 
-        // 4) Nombre de tokens
-        let token_count = estimate_token_count(&content);
-
-        // 5) Stockage
         results.push(FileMeta {
             path: path.display().to_string(),
-            file_type,
-            token_count,
         });
     }
     results
-
 }

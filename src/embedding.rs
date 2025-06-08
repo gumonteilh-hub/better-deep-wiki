@@ -3,8 +3,6 @@ use reqwest::header::{AUTHORIZATION, CONTENT_TYPE};
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
-use tiktoken_rs::cl100k_base;
-
 use crate::types::{Chunk, Embedding};
 use crate::utils::MAX_SEQUENCE_LENGTH;
 
@@ -32,26 +30,14 @@ impl fmt::Display for EmbedResult {
     }
 }
 
-fn truncate_to_max_tokens(text: &str, max_tokens: usize) -> String {
-    let enc = cl100k_base().expect("error instantiation tiktoken_rs");
-    let tokens = enc.encode_ordinary(text);
-    if tokens.len() <= max_tokens {
-        text.to_string()
-    } else {
-        let truncated = enc
-            .decode(tokens[..max_tokens].to_vec())
-            .unwrap_or_default();
-        truncated
-    }
-}
-
 #[async_trait::async_trait]
 pub trait Embedder {
     async fn embed_batch(&self, inputs: Vec<Chunk>) -> Result<Vec<Embedding>, String>;
+    async fn embed_question(&self, question: String) -> Result<Vec<f32>, String>;
 }
 
 pub struct MistralEmbedder {
-    pub dim: usize,
+    // dim: usize,
     pub api_key: String,
     pub endpoint: String,
     pub model: String,
@@ -75,7 +61,7 @@ struct MistralEmbeddingData {
 }
 
 impl MistralEmbedder {
-    pub fn from_env(dim: usize) -> Self {
+    pub fn from_env() -> Self {
         let api_key = std::env::var("MISTRAL_API_KEY").expect("MISTRAL_API_KEY must be set");
         let endpoint = std::env::var("MISTRAL_ENDPOINT")
             .unwrap_or_else(|_| "https://api.mistral.ai/v1/embeddings".to_string());
@@ -85,7 +71,6 @@ impl MistralEmbedder {
         let client = Client::new();
 
         Self {
-            dim,
             api_key,
             endpoint,
             model,
@@ -148,15 +133,64 @@ impl Embedder for MistralEmbedder {
         let mut result = Vec::new();
 
         for (index, data) in parsed.data.into_iter().enumerate() {
-            result.push(Embedding::new(
-                inputs[index].path.clone(),
-                inputs[index].chunk_index,
-                inputs[index].chunk_start_line,
-                inputs[index].chunk_end_line,
-                data.embedding,
-            ));
+            result.push(Embedding::new(inputs[index].clone(), data.embedding));
         }
 
         Ok(result)
+    }
+
+    async fn embed_question(&self, question: String) -> Result<Vec<f32>, String> {
+        let question = question;
+        if question.trim().is_empty()
+            || question.len() > MAX_SEQUENCE_LENGTH
+            || !question.is_char_boundary(question.len())
+        {
+            return Err(format!(
+                "Invalid chunk: empty, too long, or invalid char boundary: question={}",
+                question
+            ));
+        }
+
+        let req_body = MistralEmbeddingRequest {
+            model: &self.model,
+            input: &[question],
+        };
+
+        let res = self
+            .client
+            .post(&self.endpoint)
+            .header(AUTHORIZATION, format!("Bearer {}", self.api_key))
+            .header(CONTENT_TYPE, "application/json")
+            .json(&req_body)
+            .send()
+            .await
+            .map_err(|e| format!("HTTP error: {e}"))?;
+
+        if !res.status().is_success() {
+            let status = res.status();
+            let body = res
+                .text()
+                .await
+                .unwrap_or_else(|e| format!("(error reading body: {e})"));
+            return Err(format!(
+                "Mistral API error: status {} — body: {}",
+                status, body
+            ));
+        }
+
+        let parsed: MistralEmbeddingResponse = res
+            .json()
+            .await
+            .map_err(|e| format!("Error parsing response: {e}"))?;
+
+        if parsed.data.len() != 1 {
+            return Err(format!(
+                "API returned {} embeddings for 1 input (expected 1)",
+                parsed.data.len()
+            ));
+        }
+
+        let data = &parsed.data[0];
+        Ok(data.embedding.clone())
     }
 }

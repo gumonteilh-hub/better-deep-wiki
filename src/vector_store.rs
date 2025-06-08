@@ -1,115 +1,191 @@
-use rusqlite::{Connection, Result, params};
-use std::path::Path;
-
-use crate::types::Embedding;
+use crate::types::{Chunk, Embedding};
+use qdrant_client::Qdrant;
+use qdrant_client::config::QdrantConfig;
+use qdrant_client::qdrant::{
+    CreateCollectionBuilder, Distance, PointStruct, SearchPointsBuilder, UpsertPointsBuilder,
+    VectorParamsBuilder,
+};
+use std::collections::HashMap;
+use std::iter::Iterator;
 
 pub struct VectorStore {
-    conn: Connection,
+    client: Qdrant,
+    collection_name: String,
+    vector_dim: usize,
 }
 
 impl VectorStore {
-    pub fn new<P: AsRef<Path>>(db_path: P) -> Result<Self> {
-        let conn = Connection::open(db_path)?;
-        conn.execute_batch(
-            "CREATE TABLE IF NOT EXISTS embeddings (
-                id TEXT PRIMARY KEY,
-                path TEXT NOT NULL,
-                chunk_index INTEGER NOT NULL,
-                chunk_start_line INTEGER NOT NULL,
-                chunk_end_line INTEGER NOT NULL,
-                vector BLOB NOT NULL
-            );",
-        )?;
-        Ok(Self { conn })
-    }
+    pub async fn reset_or_create(collection_name: &str, vector_dim: usize) -> Result<Self, String> {
+        let config = QdrantConfig::from_url("http://localhost:6334");
+        let client = Qdrant::new(config).map_err(|e| e.to_string())?;
 
-    pub fn insert_many_embeddings_bulk(&mut self, embeddings: &[Embedding]) -> Result<()> {
-        let tx = self.conn.transaction()?;
-        {
-            let mut stmt = tx.prepare(
-                "INSERT OR REPLACE INTO embeddings 
-            (id, path, chunk_index, chunk_start_line, chunk_end_line, vector)
-            VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
-            )?;
-
-            for emb in embeddings {
-                let bytes = f32_slice_to_bytes(&emb.vector);
-                stmt.execute(params![
-                    emb.id,
-                    emb.path,
-                    emb.chunk_index,
-                    emb.chunk_start_line,
-                    emb.chunk_end_line,
-                    bytes
-                ])?;
-            }
+        let exists = client
+            .collection_exists(collection_name)
+            .await
+            .map_err(|e| e.to_string())?;
+        if exists {
+            client
+                .delete_collection(collection_name)
+                .await
+                .expect("Error trying to reset collection");
         }
-        tx.commit()?;
-        Ok(())
+        client
+            .create_collection(
+                CreateCollectionBuilder::new(collection_name).vectors_config(
+                    VectorParamsBuilder::new(vector_dim as u64, Distance::Cosine),
+                ),
+            )
+            .await
+            .map_err(|e| e.to_string())?;
+
+        Ok(Self {
+            client,
+            collection_name: collection_name.to_string(),
+            vector_dim,
+        })
     }
 
-    pub fn insert_embedding(&self, emb: &Embedding) -> Result<()> {
-        let bytes = f32_slice_to_bytes(&emb.vector);
-        self.conn.execute(
-            "INSERT OR REPLACE INTO embeddings
-            (id, path, chunk_index, chunk_start_line, chunk_end_line, vector)
-            VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
-            params![
-                emb.id,
-                emb.path,
-                emb.chunk_index as u32,
-                emb.chunk_start_line as u32,
-                emb.chunk_end_line as u32,
-                bytes
-            ],
-        )?;
-        Ok(())
+    pub async fn try_open(collection_name: &str, vector_dim: usize) -> Result<Self, String> {
+        let config = QdrantConfig::from_url("http://localhost:6334");
+        let client = Qdrant::new(config).map_err(|e| e.to_string())?;
+
+        let exists = client
+            .collection_exists(collection_name)
+            .await
+            .map_err(|e| e.to_string())?;
+        if !exists {
+            return Err(format!("No collection {} found", collection_name));
+        }
+
+        Ok(Self {
+            client,
+            collection_name: collection_name.to_string(),
+            vector_dim,
+        })
     }
 
-    pub fn list_embeddings(&self) -> Result<Vec<Embedding>> {
-        let mut stmt = self.conn.prepare(
-            "SELECT id, path, chunk_index, chunk_start_line, chunk_end_line, vector FROM embeddings"
-        )?;
-        let rows = stmt.query_map([], |row| {
-            let id: String = row.get(0)?;
-            let path: String = row.get(1)?;
-            let chunk_index: u32 = row.get(2)?;
-            let start: u32 = row.get(3)?;
-            let end: u32 = row.get(4)?;
-            let blob: Vec<u8> = row.get(5)?;
-            let vector = bytes_to_f32_vec(&blob)?;
-            Ok(Embedding {
-                id,
-                path,
-                chunk_index: chunk_index as usize,
-                chunk_start_line: start as usize,
-                chunk_end_line: end as usize,
-                vector,
+    pub async fn insert_many_embeddings_bulk(
+        &self,
+        embeddings: &[Embedding],
+    ) -> Result<(), String> {
+        let points: Vec<PointStruct> = embeddings
+            .iter()
+            .filter(|e| {
+                let ok = e.vector.len() == self.vector_dim && !e.vector.is_empty();
+                if !ok {
+                    eprintln!("SKIP embedding id={} len={}", e.id, e.vector.len());
+                }
+                ok
             })
-        })?;
-        rows.collect()
-    }
-}
+            .map(|emb| {
+                let mut payload = HashMap::new();
+                payload.insert("path".to_string(), emb.chunk.path.clone().into());
+                payload.insert(
+                    "chunk_index".to_string(),
+                    (emb.chunk.chunk_index as i64).into(),
+                );
+                payload.insert(
+                    "chunk_start_line".to_string(),
+                    (emb.chunk.chunk_start_line as i64).into(),
+                );
+                payload.insert(
+                    "chunk_end_line".to_string(),
+                    (emb.chunk.chunk_end_line as i64).into(),
+                );
+                payload.insert(
+                    "chunk_text".to_string(),
+                    (emb.chunk.text.clone() as String).into(),
+                );
 
-// Conversion utils identiques
-fn f32_slice_to_bytes(vec: &[f32]) -> Vec<u8> {
-    let len = vec.len();
-    let ptr = vec.as_ptr() as *const u8;
-    unsafe { std::slice::from_raw_parts(ptr, len * 4).to_vec() }
-}
+                PointStruct::new(emb.id.clone(), emb.vector.clone(), payload)
+            })
+            .collect();
 
-fn bytes_to_f32_vec(bytes: &[u8]) -> Result<Vec<f32>> {
-    if bytes.len() % 4 != 0 {
-        return Err(rusqlite::Error::FromSqlConversionFailure(
-            bytes.len(),
-            rusqlite::types::Type::Blob,
-            Box::new(std::io::Error::new(
-                std::io::ErrorKind::InvalidData,
-                "Blob size not a multiple of 4",
-            )),
-        ));
+        self.client
+            .upsert_points(UpsertPointsBuilder::new(&self.collection_name, points))
+            .await
+            .map_err(|e| e.to_string())?;
+        Ok(())
     }
-    let len = bytes.len() / 4;
-    let ptr = bytes.as_ptr() as *const f32;
-    unsafe { Ok(std::slice::from_raw_parts(ptr, len).to_vec()) }
+
+    pub async fn search_top_k(
+        &self,
+        query_vector: &[f32],
+        top_k: u64,
+    ) -> Result<Vec<Chunk>, String> {
+        let search_builder =
+            SearchPointsBuilder::new(&self.collection_name, query_vector.to_vec(), top_k)
+                .with_payload(true);
+
+        let resp = self
+            .client
+            .search_points(search_builder)
+            .await
+            .map_err(|e| e.to_string())?;
+
+        let results = resp
+            .result
+            .iter()
+            .map(|pt| Self::extract_payload(&pt).unwrap())
+            .collect();
+
+        Ok(results)
+    }
+
+    fn extract_payload(pt: &qdrant_client::qdrant::ScoredPoint) -> Result<Chunk, &'static str> {
+        let payload = &pt.payload;
+
+        let path = payload
+            .get("path")
+            .and_then(|v| v.kind.as_ref())
+            .and_then(|kind| match kind {
+                qdrant_client::qdrant::value::Kind::StringValue(s) => Some(s.clone()),
+                _ => None,
+            })
+            .ok_or("Missing or invalid 'path' in payload")?;
+
+        let chunk_index = payload
+            .get("chunk_index")
+            .and_then(|v| v.kind.as_ref())
+            .and_then(|kind| match kind {
+                qdrant_client::qdrant::value::Kind::IntegerValue(i) => Some(*i as usize),
+                _ => None,
+            })
+            .ok_or("Missing or invalid 'chunk_index' in payload")?;
+
+        let chunk_start_line = payload
+            .get("chunk_start_line")
+            .and_then(|v| v.kind.as_ref())
+            .and_then(|kind| match kind {
+                qdrant_client::qdrant::value::Kind::IntegerValue(i) => Some(*i as usize),
+                _ => None,
+            })
+            .ok_or("Missing or invalid 'chunk_start_line' in payload")?;
+
+        let chunk_end_line = payload
+            .get("chunk_end_line")
+            .and_then(|v| v.kind.as_ref())
+            .and_then(|kind| match kind {
+                qdrant_client::qdrant::value::Kind::IntegerValue(i) => Some(*i as usize),
+                _ => None,
+            })
+            .ok_or("Missing or invalid 'chunk_end_line' in payload")?;
+
+        let chunk_text = payload
+            .get("chunk_text")
+            .and_then(|v| v.kind.as_ref())
+            .and_then(|kind| match kind {
+                qdrant_client::qdrant::value::Kind::StringValue(s) => Some(s.clone()),
+                _ => None,
+            })
+            .ok_or("Missing or invalid 'chunk_end_line' in payload")?;
+
+        Ok(Chunk {
+            path,
+            chunk_index,
+            chunk_start_line,
+            chunk_end_line,
+            text: chunk_text,
+        })
+    }
 }
