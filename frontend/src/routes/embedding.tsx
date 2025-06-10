@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { getIndexableRepos, scanRepo } from "../service";
 
@@ -11,6 +11,7 @@ function Embedding() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [repoIdentifier, setRepoIdentifier] = useState("");
+  const navigate = useNavigate()
 
   const fetchRepos = async () => {
     setLoading(true);
@@ -29,7 +30,9 @@ function Embedding() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!repoIdentifier) return;
-    scanRepo(repoIdentifier);
+    scanRepo(repoIdentifier).then(res => {
+      navigate({to: `/ask/${res.repo_identifier}`})
+    })
   };
 
   return (

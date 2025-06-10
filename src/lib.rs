@@ -14,7 +14,7 @@ mod utils;
 mod vector_store;
 
 pub use api::*;
-use tokio::runtime::Builder;
+use tokio::sync::mpsc::Sender;
 use types::Chunk;
 
 pub async fn scan_repo(repo_name: String) -> String {
@@ -43,7 +43,7 @@ pub async fn scan_repo(repo_name: String) -> String {
         }
     });
     writter.flush().unwrap();
-    println!("Finish preparing chunks");
+    println!("Finished preparing chunks");
 
     let reader =
         chunk_writter::ChunkBinReader::<Chunk>::open(format!("generated/{}", &repo_name).as_str())
@@ -83,6 +83,7 @@ pub async fn scan_repo(repo_name: String) -> String {
         }
     }
 
+    println!("Embedding of {repo_name} finished with sucess !");
     repo_name
 }
 
@@ -90,7 +91,8 @@ pub async fn ask_repo(
     question: String,
     instructions: String,
     repo_name: String,
-) -> Result<String, String> {
+    tx: Sender<String>,
+) -> Result<(), String> {
     let db = VectorStore::try_open(&repo_name, 1536).await?;
 
     let embedder = embedding::MistralEmbedder::from_env();
@@ -122,11 +124,9 @@ pub async fn ask_repo(
 
     utils::calculate_ask_cost(&prompt);
 
-    // 5. Appel au LLM pour générer la réponse augmentée
-    let response = chatter::chat_mistral(prompt).await?;
+    chatter::chat_mistral_stream(prompt, tx).await?;
 
-    Ok(response)
-    // })
+    Ok(())
 }
 
 pub fn collect_repos() -> std::io::Result<Vec<String>> {

@@ -9,129 +9,107 @@
 | Tool | Recommended Version | Purpose |
 |------|---------------------|---------|
 | **Rust** | stable ≥ 1.77 | Compiles the `better-deep-wiki` binary |
+| **Node.js + npm** | ≥ 20.x | Runs the React frontend |
 | **Docker** | ≥ 24.x | Runs Qdrant (vector database) |
 | **Qdrant** | image `qdrant/qdrant` | Stores embeddings |
 | **MistralAI API key** | — | Generates embeddings & answers |
-
-> Better DeepWiki only supports MistralAI APIs for now.
 
 ---
 
 ## 2 · Launch Qdrant Locally
 
 ```bash
-# Create a persistent Docker volume
-$ docker volume create qdrant_data
-
-# Start Qdrant (HTTP 6333, gRPC 6334)
-$ docker run \
+docker volume create qdrant_data
+docker run \
     -p 6333:6333 -p 6334:6334 \
     -v qdrant_data:/qdrant/storage \
     qdrant/qdrant
 ```
 
-Keep this container running for the remainder of the session.
-
 ---
 
-## 3 · Build Better DeepWiki
+## 3 · Configure the Backend
 
-```bash
-# Inside the project root
-$ cargo build --release
-
-# Resulting binary
-./target/release/better-deep-wiki
-```
-
-*Omit `--release` for faster, non‑optimised builds during development.*
-
----
-
-## 4 · Environment Configuration
-
-1. Duplicate the example file:
+1. Duplicate the example env file:
    ```bash
-   $ cp .env.bak .env
+   cp .env.bak .env
    ```
-2. Edit `.env` and set at least one API key:
+2. Edit `.env` and set your Mistral API key:
    ```env
-   MISTRAL_API_KEY="your‑mistral‑key"
+   MISTRAL_API_KEY="your-mistral-key"
    ```
-3. (Optional) Adjust the embedding model.
 
 ---
 
-## 5 · Prepare the Repository to Analyse
+## 4 · Prepare the Repository to Analyse
 
-Clone (or copy) your target repository into the **`clone/`** directory at the project’s root:
+Clone (or copy) your target repository into the `clone/` directory at the project’s root:
 
 ```bash
-$ git clone git@github.com:acme/repo_test.git clone/repo_test
+git clone git@github.com:acme/repo_test.git clone/repo_test
 ```
-
-> Better DeepWiki deliberately avoids performing the clone itself; it only accepts a local path.
 
 ---
 
-## 6 · Generate Embeddings
+## 5 · Start the Application
 
+**Backend (Rust)**
 ```bash
-./target/release/better-deep-wiki embed \
-  --repo-path clone/repo_test
+cargo run
 ```
 
-The command:
-1. Recursively scans the repository.
-2. Splits files into chunks.
-3. Sends each chunk for embedding.
-4. Persists vectors in Qdrant.
-
----
-
-## 7 · Query the Indexed Repository
-
+**Frontend (React)**
 ```bash
-./target/release/better-deep-wiki query \
-  --question "What does the scheduler module do?" \
-  --instructions "Answer concisely in markdown" \
-  --repo-path clone/repo_test
+cd frontend
+npm install
+npm run dev
 ```
 
-- **--question** — the information you seek about the codebase.  
-- **--instructions** — optional guidance on tone, language, or format.
-
-The RAG pipeline selects the most relevant chunks and feeds them, along with your question, to the LLM.
+The web UI is now accessible at http://localhost:5173.
 
 ---
 
-## 8 · Helpful Commands
+## 6 · How to Use
 
-| Description | Command |
-|-------------|---------|
-| Global help | `better-deep-wiki --help` |
-| Embed module help | `better-deep-wiki embed --help` |
-| Query module help | `better-deep-wiki query --help` |
+### **Step 1 — Index a Repository**
+
+- On the web UI, select a repository present in `/clone/` and start the indexing process.
+- The interface shows progress and confirms when embedding is done.
+
+<p align="center">
+  <img src="screenshots/indexation-exemple.png" width="700" alt="Indexation example screenshot">
+</p>
 
 ---
 
-## 9 · Troubleshooting
+### **Step 2 — Ask Questions**
+
+- Once the repository is indexed, type your questions into the prompt area.
+- Answers are generated using context from your codebase.
+
+<p align="center">
+  <img src="screenshots/question-exemple.png" width="700" alt="Question example screenshot">
+</p>
+
+---
+
+## 7 · Troubleshooting
 
 | Symptom | Likely Cause |
 |---------|--------------|
 | `connection refused: 6333` | Qdrant container is not running |
-| API *rate limit* errors | Reduce batch sizes or increase back‑off timing |
-| `repo path not found` | `--repo-path` does not point to an existing local directory |
+| API *rate limit* errors | Reduce usage or check your API quota |
+| Repository not listed | Ensure your repo is present in the `/clone/` directory |
 
 ---
 
-## 10 · Philosophy & Limitations
+## 8 · Philosophy & Limitations
 
-Better DeepWiki favours the *Unix philosophy*: a single, explicit workflow with minimal hidden behaviour. If you need to index multiple versions of a project, run separate instances (e.g. `clone/repo_v1`, `clone/repo_v2`).
+Better DeepWiki follows the *Unix philosophy*: a single, explicit workflow with minimal hidden behaviour. No internal repo cloning. One repo = one indexation.
 
 ---
 
-## 11 · Licence
+## 9 · Licence
 
 MIT — see `LICENSE`.
 

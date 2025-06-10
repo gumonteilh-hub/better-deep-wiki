@@ -38,6 +38,34 @@ export function askRepo(repo_identifier: string, question: string, instructions:
   return api.post<AskResponse>("/ask_repo", { question, instructions, repo_identifier }).then((res) => res.data);
 }
 
+export async function fetchStreamedCompletion(
+  repo_identifier: string, question: string, instructions: string,
+  onChunk: (text: string) => void
+): Promise<void> {
+  const res = await fetch("http://localhost:3000/ask_repo", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ question, instructions, repo_identifier }),
+  });
+
+  if (!res.body) throw new Error("No response body");
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+
+  while (true) {
+    const { value, done } = await reader.read();
+    if (value) {
+      const text = decoder.decode(value, { stream: true });
+      onChunk(text);
+    }
+    if (done) break;
+  }
+}
+
+
 /**
  * Retrieve the list of indexed repositories
  */

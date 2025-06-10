@@ -8,8 +8,9 @@ export interface SidebarProps {
 export default function Sidebar({ repos, currentRepo }: SidebarProps) {
   return (
     <nav className="sidebar">
-      <div>
+      <div className="navbar-repo-list">
         <h2>Repos indexés</h2>
+        <br></br>
         {repos.length === 0 ? (
           <p>Aucun dépôt indexé</p>
         ) : (
@@ -31,9 +32,11 @@ export default function Sidebar({ repos, currentRepo }: SidebarProps) {
         )}
       </div>
 
-      <Link to="/embedding" className="add-repo">
-        + Ajouter un repo
-      </Link>
+      <div className="navbar-add-repo">
+        <Link to="/embedding" className="add-repo">
+          + Ajouter un repo
+        </Link>
+      </div>
     </nav>
   );
 }
