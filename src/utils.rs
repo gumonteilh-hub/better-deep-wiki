@@ -89,12 +89,3 @@ pub fn prepare_chunk(path: &str, index: usize, text: &str) -> String {
     format!("file: {} | {}\n\n{}", path, index, text.trim())
 }
 
-pub fn compute_repo_identifier(repo_path: &String) -> String {
-    let trimmed = if repo_path.ends_with('/') {
-        &repo_path[..repo_path.len() - 1]
-    } else {
-        &repo_path
-    };
-
-    trimmed.replace("./", "").replace("/", "_")
-}

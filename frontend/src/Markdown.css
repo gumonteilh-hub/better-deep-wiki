@@ -1,0 +1,45 @@
+.markdown-body {
+    font-size: 0.95rem;
+    color: #222;
+    line-height: 1.7;
+    font-family: ui-sans-serif, system-ui, sans-serif;
+  }
+  .markdown-body h1, .markdown-body h2 {
+    margin: 1em 0 0.5em 0;
+    font-weight: bold;
+  }
+  .markdown-body pre.code-block {
+    background: #f6f8fa;
+    color: #1a1a1a;
+    border-radius: 8px;
+    padding: 1em;
+    overflow-x: auto;
+    margin: 1em 0;
+  }
+  .markdown-body code {
+    font-family: ui-monospace, "SFMono-Regular", "Consolas", monospace;
+    background: #f1f1f1;
+    border-radius: 4px;
+    padding: 0.2em 0.4em;
+    font-size: 0.92em;
+  }
+  .markdown-body blockquote {
+    border-left: 3px solid #d1d5db;
+    background: #fafbfc;
+    color: #555;
+    margin: 1em 0;
+    padding: 0.8em 1em;
+    border-radius: 6px;
+  }
+  .markdown-body ul {
+    padding-left: 1.6em;
+    margin: 0.7em 0;
+  }
+  .markdown-body li {
+    margin: 0.2em 0;
+  }
+  .markdown-body a {
+    color: #2563eb;
+    text-decoration: underline;
+  }
+  
