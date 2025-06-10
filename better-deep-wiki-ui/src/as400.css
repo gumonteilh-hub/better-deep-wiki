@@ -1,0 +1,242 @@
+/* Couleurs et typo inspirées AS400 */
+:root {
+  --bg: #111111;
+  --bg-light: #1c1c1c;
+  --border: #333;
+  --text: #e0e0e0;
+  --text-muted: #999;
+  --accent: #00b386; /* vert doux, pas fluo */
+  --accent-hover: #009973;
+  --font: "Courier New", Courier, monospace;
+}
+
+/* Global reset */
+body {
+  margin: 0;
+  font-family: var(--font);
+  background-color: var(--bg);
+  color: var(--text);
+}
+
+h1,
+h2,
+h3 {
+  margin: 0;
+  font-weight: 500;
+}
+
+/* Empêche le scroll de la page */
+html,
+body {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+}
+
+/* Fixe l'app à 100% de la fenêtre, sans débordement */
+.app-grid {
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* Permet le scroll *interne* seulement dans les zones prévues */
+.app-main,
+.ask-repo main {
+  overflow-y: auto;
+}
+
+/* Root layout */
+.app-grid {
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  grid-template-columns: 220px 1fr;
+  height: 100vh;
+}
+
+.app-header {
+  grid-column: span 2;
+  display: flex;
+  align-items: center;
+  padding: 0 1rem;
+  height: 3rem;
+  border-bottom: 1px solid var(--border);
+  background-color: var(--bg-light);
+}
+
+.app-main {
+  overflow-y: auto;
+  padding: 1rem;
+}
+
+/* Sidebar */
+.sidebar {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  padding: 1rem;
+  justify-content: space-between;
+  background-color: var(--bg-light);
+  border-right: 1px solid var(--border);
+}
+
+.sidebar h2 {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 0.5rem;
+  color: var(--text-muted);
+}
+
+.sidebar ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.sidebar li {
+  margin-bottom: 0.25rem;
+}
+
+.sidebar a {
+  display: block;
+  padding: 0.5rem;
+  border-radius: 0.5rem;
+  text-decoration: none;
+  color: var(--text);
+  background-color: transparent;
+  transition: background 0.2s;
+}
+
+.sidebar a:hover {
+  background-color: var(--bg);
+}
+
+.sidebar a.active {
+  background-color: var(--bg);
+  font-weight: bold;
+  box-shadow: inset 0 0 0 1px var(--border);
+}
+
+.sidebar p {
+  font-style: italic;
+  color: var(--text-muted);
+}
+
+.sidebar .add-repo {
+    margin-bottom: 2rem;
+    color: var(--accent);
+    font-weight: bold;
+    text-decoration: none;
+  }
+
+/* AskRepo component */
+.ask-repo {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.ask-repo header {
+  padding: 0.75rem 1rem;
+  background-color: var(--bg-light);
+  border-bottom: 1px solid var(--border);
+}
+
+.ask-repo main {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1rem;
+}
+
+.ask-repo pre,
+.ask-repo p {
+  font-size: 0.85rem;
+  white-space: pre-wrap;
+  line-height: 1.5;
+  font-family: var(--font);
+  color: var(--text);
+}
+
+.ask-repo p.placeholder {
+  color: var(--text-muted);
+}
+
+.ask-repo form {
+  display: flex;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  border-top: 1px solid var(--border);
+  background-color: var(--bg-light);
+}
+
+.ask-repo textarea {
+  flex: 1;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--border);
+  background-color: var(--bg);
+  color: var(--text);
+  border-radius: 4px;
+  font-size: 0.85rem;
+  font-family: var(--font);
+  resize: none;
+  field-sizing: content;
+}
+
+.ask-repo textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.ask-repo button {
+  padding: 0.5rem 0.75rem;
+  background-color: var(--accent);
+  color: var(--bg);
+  border: none;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  font-weight: bold;
+  transition: background 0.2s;
+}
+
+.ask-repo button:hover {
+  background-color: var(--accent-hover);
+}
+
+.ask-repo button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.instruction-container {
+    margin-top: 1rem;
+  }
+  .instruction-header {
+    display: flex;
+    flex-direction: row-reverse;
+    gap: 2rem;
+    margin-inline: 1rem;
+    margin-bottom: 1rem;
+  }
+
+  .instruction-icon {
+    width: 2rem;
+  }
+  
+  .instruction-toggle-button {
+    background: none;
+    border: none;
+    font-size: 1rem;
+    cursor: pointer;
+    background-color: transparent;
+  }
+
+  .instruction-textarea {
+    width: 100%;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    padding: 0.5rem;
+    font-size: 0.875rem;
+    resize: none;
+  }
+  

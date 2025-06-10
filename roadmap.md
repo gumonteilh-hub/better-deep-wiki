@@ -1,68 +1,60 @@
-Feuille de route DeepWiki-Rust
-1. Initialisation du projet
- Créer le repo Rust (avec Cargo, structure modulaire dès le départ)
+# Better DeepWiki Roadmap (Rust)
 
- Rédiger le README d’intention/philosophie (explicite sur les choix d’architecture, le “no magic”, la cible OpenAI/Mistral, etc.)
+> **Philosophy:** opinionated simplicity, robustness, and performance; every milestone must deliver direct value without adding unnecessary complexity.
 
- Mettre en place les outils de formatage/linting/tests (rustfmt, clippy, CI minimale)
+---
 
-2. Traitement de base du repo
- Entrée CLI : chemin d’un dossier local contenant un projet code déjà cloné
+## 0️⃣ Completed – v0.1 ✅
 
- Scan récursif du repo, exclusion configurable de certains dossiers/fichiers (patterns .gitignore-like)
+- **CLI application:** minimal RAG (repository traversal, embeddings, question/answer)
 
- Découpage du code en chunks (par fichier, classe, fonction, ou lignes) – à tester et ajuster selon les besoins RAG
+---
 
- Gestion des erreurs robustes sur les accès fichiers, dossiers inexistants, encodages, etc.
+## 2️⃣ v0.3 – Graphical Interface
 
-3. Intégration API d’embedding
- Interface d’appel générique à une API OpenAI-compatible (clé/URL/API model en config simple)
+- HTTP API served by **axum**
+- Minimal **React** UI written in **TypeScript**: query field, answer display, highlighted context
 
- Implémentation concrète : OpenAI embeddings
+---
 
- Implémentation concrète : MistralAI embeddings (compatible OpenAI)
+## 1️⃣ v0.2 – Dockerization
 
- Gestion de la rate-limit, du batching et du retry
+- Official lightweight container bundling the Rust binary **and an embedded Qdrant instance** for vector storage
+- One‑command deployment with `docker compose`
 
-4. Stockage et recherche vectorielle
- Choix d’une solution simple : SQLite (local), ou support optionnel d’un service vectoriel type Qdrant/Pinecone (mais en second plan)
+---
 
- Stockage local des embeddings, mapping chunk<->embedding
+## 3️⃣ v0.4 – RAG Optimisation & OpenAI Support
 
- Recherche de similarité (cosinus, top-k)
+- Option to use OpenAI embeddings and completions
+- Improved ranking with tunable parameters
+- **Explanatory schema generation at embedding time** to visualise key codebase features
 
- API interne/CLI pour interroger la base vectorielle
+---
 
-5. Composant RAG (Retrieval-Augmented Generation)
- Appel du LLM (OpenAI/Mistral) pour générer la réponse à une question donnée, en injectant les chunks les plus proches
+## 4️⃣ v0.5 – Sessions & Context
 
- Gestion context window (limiter la taille de la prompt contextuelle)
+- Session mechanism enabling **iterative queries**, carrying intermediate answers forward as context
+- Configurable TTL and memory budget
 
- CLI simple ou API HTTP pour tester la chaîne RAG (pose une question, reçois la réponse augmentée)
+---
 
-6. Interface utilisateur minimale
- (Optionnel) Petite API web (avec e.g. axum ou warp), ou simple CLI interactive pour usage direct
+## 5️⃣ v0.6 – Deep‑Searching
 
- Interface web simple (si besoin) : champ de question, affichage résultat, log des requêtes
+- Iterative queries ("rounds") to refine answers
+- `--depth` parameter to control search depth
+- Guardrails to avoid loops and excessive cost
 
-7. Qualité, DX et doc
- Ajout de logs, gestion d’erreurs et reporting clairs
+---
 
- Documentation claire (README, utilisation, limites, choix techniques)
+## 🌐 Cross‑cutting tasks
 
- Exemples d’utilisation
+| Axis | Description |
+|------|-------------|
+| Security | Dependency audit, secret management |
+| DX | Readable logs, actionable errors, examples |
+| Documentation | Guides, architecture diagrams, changelog |
 
- Suite de tests unitaires (scénarios de chunking, embedding, recherche)
+---
 
- Scripts de build et déploiement (release binaire, Docker si besoin)
-
-8. Extensions (si le projet reste simple)
- Prise en charge de plusieurs repos/index
-
- Support optionnel d’un stockage cloud (S3, GCS)
-
- Export/Import de la base vectorielle
-
-NB :
-Chacune de ces étapes peut être découpée en issues GitHub et traitée itérativement. Tu peux pousser du code utilisable après chaque milestone, pour valider le fonctionnement en conditions réelles rapidement.
-
+*Roadmap is indicative and subject to change.*

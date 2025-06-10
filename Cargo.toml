@@ -1,20 +1,54 @@
 [package]
-name = "better-deep-wiki"
+name    = "better-deep-wiki"
 version = "0.1.0"
 edition = "2024"
+default-run  = "better-deep-wiki-api"
 
+# ──────── Crate/lib ────────
+[lib]
+path        = "src/lib.rs"   # implicite ; on l’écrit pour la clarté
+crate-type  = ["rlib"]
+
+# ──────── Binaire CLI (optionnel) ────────
+
+[[bin]]
+name              = "better-deep-wiki-api"
+path              = "src/bin/main_api.rs"
+required-features = ["api"]        # la feature est dans `default`, donc builds sans flag
+
+[[bin]]
+name              = "better-deep-wiki-cli"
+path              = "src/bin/cli.rs"
+required-features = ["cli"]     # compilé si --features cli
+
+# ──────── Dépendances « cœur » (toujours nécessaires) ────────
 [dependencies]
-async-trait = "0.1.88"
-bincode = { version = "2.0.1", features = ["derive"] }
-clap = { version = "4.5.39", features = ["derive"] }
-dotenvy = "0.15.7"
-ignore = "0.4.23"
-qdrant-client = "1.14.0"
-rayon = "1.10.0"
-reqwest = {  version =  "0.12.19" , features = ["json", "rustls-tls"] }
-rusqlite = "0.36.0"
-serde = { version = "1.0.219", features = ["derive"] }
-tiktoken-rs = "0.7.0"
-tokio = "1.45.1"
-uuid = { version ="1.17.0", features = ["v4"] }
-walkdir = "2.5.0"
+async-trait      = "0.1.88"
+bincode          = { version = "2.0.1", features = ["derive"] }
+dotenvy          = "0.15.7"
+ignore           = "0.4.23"
+qdrant-client    = "1.14.0"
+rayon            = "1.10.0"
+reqwest          = { version = "0.12.19", features = ["json", "rustls-tls"] }
+rusqlite         = "0.36.0"
+serde            = { version = "1.0.219", features = ["derive"] }
+tiktoken-rs      = "0.7.0"
+tokio            = { version = "1.45.1", features = ["rt-multi-thread", "macros"] }
+tracing          = "0.1.41"
+tracing-subscriber = { version = "0.3.19", features = ["fmt", "env-filter"] }
+uuid             = { version = "1.17.0", features = ["v4"] }
+walkdir          = "2.5.0"
+
+# ──────── Dépendances optionnelles (cli / api) ────────
+# API HTTP (par défaut)
+axum       = { version = "0.8.4",                       optional = true }
+tower-http = { version = "0.6.6", features = ["cors"],  optional = true }
+
+# CLI interactif
+clap       = { version = "4.5.39", features = ["derive"], optional = true }
+
+# ──────── Features ────────
+[features]
+default = ["api"]                 # compile uniquement la lib
+cli     = ["clap"]           # `cargo run --features cli --bin better-deep-wiki-cli …`
+api     = ["axum", "tower-http"]  # à activer dans ton micro-service Axum
