@@ -26,8 +26,8 @@
 
 ## 3️⃣ v0.4 – RAG Optimisation & OpenAI Support
 
-- Option to use OpenAI embeddings and completions
-- Improved ranking with tunable parameters
+- Option to use OpenAI embeddings and completions ✅
+- Improved ranking with tunable parameters ✅
 - **Explanatory schema generation at embedding time** to visualise key codebase features
 
 ---

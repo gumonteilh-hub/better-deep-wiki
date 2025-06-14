@@ -3,7 +3,7 @@ use qdrant_client::Qdrant;
 use qdrant_client::config::QdrantConfig;
 use qdrant_client::qdrant::{
     CreateCollectionBuilder, Distance, PointStruct, SearchPointsBuilder, UpsertPointsBuilder,
-    VectorParamsBuilder,
+    VectorParamsBuilder, PayloadSchemaType, CreateFieldIndexCollectionBuilder, FieldType,
 };
 use std::collections::HashMap;
 use std::iter::Iterator;
@@ -34,6 +34,18 @@ impl VectorStore {
                 CreateCollectionBuilder::new(collection_name).vectors_config(
                     VectorParamsBuilder::new(vector_dim as u64, Distance::Cosine),
                 ),
+            )
+            .await
+            .map_err(|e| e.to_string())?;
+
+        // Créer un index sur le champ chunk_text pour accélérer la recherche textuelle
+        client
+            .create_field_index(
+                CreateFieldIndexCollectionBuilder::new(
+                    collection_name, 
+                    "chunk_text", 
+                    FieldType::Text
+                ).field_type(PayloadSchemaType::Text),
             )
             .await
             .map_err(|e| e.to_string())?;
@@ -130,6 +142,141 @@ impl VectorStore {
             .collect();
 
         Ok(results)
+    }
+
+    pub async fn hybrid_search(
+        &self,
+        query_vector: &[f32],
+        query_text: &str,
+        top_k: u64,
+    ) -> Result<Vec<Chunk>, String> {
+        let (semantic_results, lexical_results) = tokio::join!(
+            self.search_top_k(query_vector, top_k * 2),
+            self.lexical_search(query_text, top_k * 2)
+        );
+        
+        let semantic_results = semantic_results?;
+        let lexical_results = lexical_results?;
+        
+        let fused_results = self.reciprocal_rank_fusion(semantic_results, lexical_results, top_k);
+        
+        Ok(fused_results)
+    }
+
+    async fn lexical_search(&self, query_text: &str, top_k: u64) -> Result<Vec<Chunk>, String> {
+        use qdrant_client::qdrant::{Filter, Condition, FieldCondition, Match};
+        
+        let query_lower = query_text.to_lowercase();
+        let query_terms: Vec<&str> = query_lower
+            .split_whitespace()
+            .filter(|term| term.len() > 2)
+            .collect();
+
+        if query_terms.is_empty() {
+            return Ok(vec![]);
+        }
+
+        let mut conditions = Vec::new();
+        
+        for term in query_terms {
+            conditions.push(Condition {
+                condition_one_of: Some(
+                    qdrant_client::qdrant::condition::ConditionOneOf::Field(
+                        FieldCondition {
+                            key: "chunk_text".to_string(),
+                            r#match: Some(Match {
+                                match_value: Some(
+                                    qdrant_client::qdrant::r#match::MatchValue::Text(term.to_string())
+                                ),
+                            }),
+                            range: None,
+                            geo_bounding_box: None,
+                            geo_radius: None,
+                            geo_polygon: None,
+                            datetime_range: None,
+                            values_count: None,
+                            is_empty: None,
+                            is_null: None,
+                        }
+                    )
+                ),
+            });
+        }
+
+        let filter = Filter {
+            should: conditions,
+            must: vec![],
+            must_not: vec![],
+            min_should: None,
+        };
+
+        // Recherche avec filtre textuel - on utilise un vecteur dummy pour la recherche
+        let dummy_vector = vec![0.0; self.vector_dim];
+        let search_builder = SearchPointsBuilder::new(&self.collection_name, dummy_vector, top_k)
+            .with_payload(true)
+            .filter(filter);
+
+        let resp = self
+            .client
+            .search_points(search_builder)
+            .await
+            .map_err(|e| e.to_string())?;
+
+        let results = resp
+            .result
+            .iter()
+            .map(|pt| Self::extract_payload(&pt).unwrap())
+            .collect();
+
+        Ok(results)
+    }
+
+    fn reciprocal_rank_fusion(
+        &self,
+        semantic_results: Vec<Chunk>,
+        lexical_results: Vec<Chunk>,
+        top_k: u64,
+    ) -> Vec<Chunk> {
+        use std::collections::HashMap;
+
+        let k = std::env::var("HYBRID_SEARCH_RRF_K")
+            .unwrap_or_else(|_| "60.0".to_string())
+            .parse::<f32>()
+            .unwrap_or(60.0);
+
+        let mut chunk_scores: HashMap<String, f32> = HashMap::new();
+        let mut all_chunks: HashMap<String, Chunk> = HashMap::new();
+
+        for (rank, chunk) in semantic_results.iter().enumerate() {
+            let chunk_id = format!("{}:{}", chunk.path, chunk.chunk_index);
+            let rrf_score = 1.0 / (k + (rank + 1) as f32);
+            
+            *chunk_scores.entry(chunk_id.clone()).or_insert(0.0) += rrf_score;
+            all_chunks.insert(chunk_id, chunk.clone());
+        }
+
+        for (rank, chunk) in lexical_results.iter().enumerate() {
+            let chunk_id = format!("{}:{}", chunk.path, chunk.chunk_index);
+            let rrf_score = 1.0 / (k + (rank + 1) as f32);
+            
+            *chunk_scores.entry(chunk_id.clone()).or_insert(0.0) += rrf_score;
+            all_chunks.insert(chunk_id, chunk.clone());
+        }
+
+        let mut scored_chunks: Vec<_> = chunk_scores
+            .into_iter()
+            .filter_map(|(chunk_id, score)| {
+                all_chunks.get(&chunk_id).map(|chunk| (chunk.clone(), score))
+            })
+            .collect();
+
+        scored_chunks.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+
+        scored_chunks
+            .into_iter()
+            .take(top_k as usize)
+            .map(|(chunk, _score)| chunk)
+            .collect()
     }
 
     fn extract_payload(pt: &qdrant_client::qdrant::ScoredPoint) -> Result<Chunk, &'static str> {

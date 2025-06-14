@@ -103,10 +103,11 @@ pub async fn ask_repo(
     let embedder = embedding::create_embedder();
     let q_vec = embedder.embed_question(question.clone()).await?;
 
+    // Utilisation de la recherche hybride pour de meilleurs résultats
     let similar_chunks = db
-        .search_top_k(&q_vec, config.top_k)
+        .hybrid_search(&q_vec, &question, config.top_k)
         .await
-        .map_err(|e| format!("Vector search failed: {e}"))?;
+        .map_err(|e| format!("Hybrid search failed: {e}"))?;
 
     // 4. Construction du prompt contextuel pour le LLM (concatène les chunks les plus proches)
     let context = similar_chunks
