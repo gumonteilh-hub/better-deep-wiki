@@ -7,6 +7,7 @@ mod api;
 mod chatter;
 mod chunk_writter;
 mod chunking;
+mod config;
 mod embedding;
 mod parsing;
 mod types;
@@ -18,14 +19,16 @@ use tokio::sync::mpsc::Sender;
 use types::Chunk;
 
 pub async fn scan_repo(repo_name: String) -> String {
+    let config = config::Config::from_env();
+    
     println!("Start parsing repo");
     let meta_files = parsing::parse_repo(format!("clone/{repo_name}"));
     println!("{} files detected.\nStart chunking", meta_files.len());
 
     let splitter = chunking::TextSplitter {
         split_by: chunking::SplitBy::Line,
-        chunk_size: 350,
-        chunk_overlap: 100,
+        chunk_size: config.chunk_size,
+        chunk_overlap: config.chunk_overlap,
     };
 
     let writter =
@@ -67,7 +70,7 @@ pub async fn scan_repo(repo_name: String) -> String {
     let embedder = embedding::MistralEmbedder::from_env();
     let batches = utils::make_batches(all_chunks);
 
-    let db = VectorStore::reset_or_create(&repo_name, 1536)
+    let db = VectorStore::reset_or_create(&repo_name, config.vector_dimension)
         .await
         .expect("Erreur init vectorstore");
 
@@ -93,14 +96,15 @@ pub async fn ask_repo(
     repo_name: String,
     tx: Sender<String>,
 ) -> Result<(), String> {
-    let db = VectorStore::try_open(&repo_name, 1536).await?;
+    let config = config::Config::from_env();
+    
+    let db = VectorStore::try_open(&repo_name, config.vector_dimension).await?;
 
     let embedder = embedding::MistralEmbedder::from_env();
     let q_vec = embedder.embed_question(question.clone()).await?;
 
-    let top_k = 10;
     let similar_chunks = db
-        .search_top_k(&q_vec, top_k)
+        .search_top_k(&q_vec, config.top_k)
         .await
         .map_err(|e| format!("Vector search failed: {e}"))?;
 

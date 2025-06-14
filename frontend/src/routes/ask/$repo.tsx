@@ -61,6 +61,7 @@ function AskRepoComponent() {
     e.preventDefault();
     const trimmed = prompt.trim();
     if (trimmed) {
+      setPrompt("");
       setConversation(p => ({ chats: [...p.chats, { type: 'Q', content: prompt }] }));
       setLoading(true)
       setResponse("")
@@ -77,12 +78,10 @@ function AskRepoComponent() {
           }
         );
       } finally {
-        setLoading(false);
         setConversation(p => ({ chats: [...p.chats, { type: 'R', content: totalResponse }] }));
         setResponse("");
       }
-      setPrompt("");
-    }
+     }
   };
 
   return (
