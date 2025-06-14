@@ -1,6 +1,6 @@
 use std::{fs, path::Path};
 
-use crate::{embedding::Embedder, vector_store::VectorStore};
+use crate::{vector_store::VectorStore};
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 
 mod api;
@@ -67,7 +67,7 @@ pub async fn scan_repo(repo_name: String) -> String {
 
     println!("Start embedding");
 
-    let embedder = embedding::MistralEmbedder::from_env();
+    let embedder = embedding::create_embedder();
     let batches = utils::make_batches(all_chunks);
 
     let db = VectorStore::reset_or_create(&repo_name, config.vector_dimension)
@@ -100,7 +100,7 @@ pub async fn ask_repo(
     
     let db = VectorStore::try_open(&repo_name, config.vector_dimension).await?;
 
-    let embedder = embedding::MistralEmbedder::from_env();
+    let embedder = embedding::create_embedder();
     let q_vec = embedder.embed_question(question.clone()).await?;
 
     let similar_chunks = db
@@ -128,7 +128,14 @@ pub async fn ask_repo(
 
     utils::calculate_ask_cost(&prompt);
 
-    chatter::chat_mistral_stream(prompt, tx).await?;
+    let provider = std::env::var("COMPLETION_PROVIDER")
+        .unwrap_or_else(|_| "mistral".to_string())
+        .to_lowercase();
+
+    match provider.as_str() {
+        "openai" => chatter::chat_openai_stream(prompt, tx).await?,
+        "mistral" | _ => chatter::chat_mistral_stream(prompt, tx).await?,
+    }
 
     Ok(())
 }

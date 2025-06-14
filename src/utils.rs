@@ -5,6 +5,10 @@ const MISTRAL_EMBEDDING_PRICE_PER_MILLION_TOKEN: f64 = 0.15;
 const MISTRAL_COMPLETION_PRICE_PER_MILLION_TOKEN: f64 = 0.4;
 const MISTRAL_RESONNING_COMPLETION_PRICE_PER_MILLION_TOKEN: f64 = 2.0;
 
+const OPENAI_TEXT_EMBEDDING_3_SMALL_PRICE_PER_MILLION_TOKEN: f64 = 0.02;
+const OPENAI_TEXT_EMBEDDING_3_LARGE_PRICE_PER_MILLION_TOKEN: f64 = 0.13;
+const OPENAI_GPT_4O_MINI_PRICE_PER_MILLION_TOKEN: f64 = 0.40;
+
 const MAX_BATCH_SIZE: usize = 128;
 const MAX_TOTAL_TOKENS: usize = 16384;
 pub const MAX_SEQUENCE_LENGTH: usize = 8192;
@@ -17,32 +21,70 @@ pub fn calculate_cost(all_chunks: &[Chunk]) {
         .map(|chunk| bpe.encode_with_special_tokens(&chunk.text).len())
         .sum();
 
-    let total_cost =
-        (total_tokens as f64 / 1_000_000.0) * MISTRAL_EMBEDDING_PRICE_PER_MILLION_TOKEN;
+    let provider = std::env::var("EMBEDDING_PROVIDER")
+        .unwrap_or_else(|_| "mistral".to_string())
+        .to_lowercase();
 
-    println!(
-        "Total tokens: {}\nEstimated embedding cost: {:.2} $",
-        total_tokens, total_cost
-    );
+    match provider.as_str() {
+        "openai" => {
+            let model = std::env::var("OPENAI_EMBEDDING_MODEL")
+                .unwrap_or_else(|_| "text-embedding-3-small".to_string());
+            
+            let price_per_million = match model.as_str() {
+                "text-embedding-3-large" => OPENAI_TEXT_EMBEDDING_3_LARGE_PRICE_PER_MILLION_TOKEN,
+                "text-embedding-3-small" | _ => OPENAI_TEXT_EMBEDDING_3_SMALL_PRICE_PER_MILLION_TOKEN,
+            };
+            
+            let total_cost = (total_tokens as f64 / 1_000_000.0) * price_per_million;
+            
+            println!(
+                "Total tokens: {}\nEstimated embedding cost with {}: ${:.2}",
+                total_tokens, model, total_cost
+            );
+        }
+        "mistral" | _ => {
+            let total_cost = (total_tokens as f64 / 1_000_000.0) * MISTRAL_EMBEDDING_PRICE_PER_MILLION_TOKEN;
+            
+            println!(
+                "Total tokens: {}\nEstimated embedding cost: ${:.2}",
+                total_tokens, total_cost
+            );
+        }
+    }
 }
 
 pub fn calculate_ask_cost(input: &String) {
     let bpe = cl100k_base().unwrap();
-
     let total_tokens = bpe.encode_with_special_tokens(input).len();
-    let total_cost_standard =
-        (total_tokens as f64 / 1_000_000.0) * MISTRAL_COMPLETION_PRICE_PER_MILLION_TOKEN;
-    let total_cost_premium =
-        (total_tokens as f64 / 1_000_000.0) * MISTRAL_RESONNING_COMPLETION_PRICE_PER_MILLION_TOKEN;
 
-    println!(
-        "Total tokens: {}\nEstimated input cost: {:.2} $ + unpredictable reponse cost with standard model",
-        total_tokens, total_cost_standard
-    );
-    println!(
-        "Total tokens: {}\nEstimated input cost: {:.2} $ + unpredictable reponse cost with premium model",
-        total_tokens, total_cost_premium
-    );
+    let provider = std::env::var("COMPLETION_PROVIDER")
+        .unwrap_or_else(|_| "mistral".to_string())
+        .to_lowercase();
+
+    match provider.as_str() {
+        "openai" => {
+            let total_cost = (total_tokens as f64 / 1_000_000.0) * OPENAI_GPT_4O_MINI_PRICE_PER_MILLION_TOKEN;
+            println!(
+                "Total tokens: {}\nEstimated input cost with GPT-4o-mini: ${:.4} + unpredictable response cost",
+                total_tokens, total_cost
+            );
+        }
+        "mistral" | _ => {
+            let total_cost_standard =
+                (total_tokens as f64 / 1_000_000.0) * MISTRAL_COMPLETION_PRICE_PER_MILLION_TOKEN;
+            let total_cost_premium =
+                (total_tokens as f64 / 1_000_000.0) * MISTRAL_RESONNING_COMPLETION_PRICE_PER_MILLION_TOKEN;
+
+            println!(
+                "Total tokens: {}\nEstimated input cost: ${:.2} + unpredictable response cost with standard model",
+                total_tokens, total_cost_standard
+            );
+            println!(
+                "Total tokens: {}\nEstimated input cost: ${:.2} + unpredictable response cost with premium model",
+                total_tokens, total_cost_premium
+            );
+        }
+    }
 }
 
 pub fn make_batches(chunks: Vec<Chunk>) -> Vec<Vec<Chunk>> {
