@@ -1,0 +1,30 @@
+FROM rust:1.87-slim
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    pkg-config \
+    libssl-dev \
+    locales \
+    && rm -rf /var/lib/apt/lists/*
+
+# Configure UTF-8 locale
+RUN sed -i '/en_US.UTF-8/s/^# //g' /etc/locale.gen && \
+    locale-gen
+ENV LANG en_US.UTF-8
+ENV LANGUAGE en_US:en
+ENV LC_ALL en_US.UTF-8
+
+# Install cargo-watch for hot reloading
+RUN cargo install cargo-watch
+
+# Set working directory
+WORKDIR /app
+
+# Create necessary directories
+RUN mkdir -p clone generated
+
+# Expose port
+EXPOSE 3000
+
+# Use cargo-watch for hot reloading, ignoring generated files
+CMD ["cargo", "watch", "--ignore", "generated/*", "--ignore", "clone/*", "-x", "run --features api --bin better-deep-wiki-api"]

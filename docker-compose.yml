@@ -1,0 +1,54 @@
+services:
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: better-deep-wiki-qdrant
+    expose:
+      - "6333"
+      - "6334"
+    volumes:
+      - qdrant_data:/qdrant/storage
+
+  backend:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    container_name: better-deep-wiki-backend
+    expose:
+      - "3000"
+    volumes:
+      - ./clone:/app/clone:ro
+      - generated_data:/app/generated
+    env_file:
+      - .env
+    depends_on:
+      - qdrant
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: better-deep-wiki-frontend
+    expose:
+      - "5173"
+
+  proxy:
+    image: nginx:alpine
+    container_name: better-deep-wiki-proxy
+    ports:
+      - "80:80"
+    volumes:
+      - ./reverse-proxy.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - backend
+      - frontend
+      - qdrant
+
+volumes:
+  qdrant_data:
+    driver: local
+  generated_data:
+    driver: local
+
+networks:
+  default:
+    name: better-deep-wiki-network

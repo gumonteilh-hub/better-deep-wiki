@@ -10,14 +10,14 @@
 
 ---
 
-## 2️⃣ v0.3 – Graphical Interface
+## 2️⃣ Completed – v0.3 – Graphical Interface ✅
 
 - HTTP API served by **axum**
 - Minimal **React** UI written in **TypeScript**: query field, answer display, highlighted context
 
 ---
 
-## 1️⃣ v0.2 – Dockerization
+## 1️⃣ Completed – v0.2 – Dockerization ✅
 
 - Official lightweight container bundling the Rust binary **and an embedded Qdrant instance** for vector storage
 - One‑command deployment with `docker compose`

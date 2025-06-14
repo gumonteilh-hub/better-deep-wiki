@@ -16,7 +16,7 @@ pub struct VectorStore {
 
 impl VectorStore {
     pub async fn reset_or_create(collection_name: &str, vector_dim: usize) -> Result<Self, String> {
-        let config = QdrantConfig::from_url("http://localhost:6334");
+        let config = QdrantConfig::from_url("http://qdrant:6334");
         let client = Qdrant::new(config).map_err(|e| e.to_string())?;
 
         let exists = client
@@ -46,7 +46,7 @@ impl VectorStore {
     }
 
     pub async fn try_open(collection_name: &str, vector_dim: usize) -> Result<Self, String> {
-        let config = QdrantConfig::from_url("http://localhost:6334");
+        let config = QdrantConfig::from_url("http://qdrant:6334");
         let client = Qdrant::new(config).map_err(|e| e.to_string())?;
 
         let exists = client

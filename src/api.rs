@@ -100,10 +100,17 @@ async fn list_indexable_repos() -> Result<Json<RepoListResponse>, (StatusCode, S
 /// ═════════════════════ public router ═════════════════════
 
 pub fn build_router() -> Router {
-    let config = QdrantConfig::from_url("http://localhost:6334").skip_compatibility_check();
-    let client = Qdrant::new(config)
-        .map_err(|e| e.to_string())
-        .expect("Fail to open Qdrant connection");
+    let config = QdrantConfig::from_url("http://qdrant:6334").skip_compatibility_check();
+    
+    let client = match Qdrant::new(config) {
+        Ok(client) => {
+            client
+        }
+        Err(e) => {
+            eprintln!("Failed to connect to Qdrant: {}", e);
+            panic!("Fail to open Qdrant connection: {}", e);
+        }
+    };
 
     let state = AppState {
         qdrant: Arc::new(client),

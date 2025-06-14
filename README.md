@@ -1,34 +1,20 @@
-# Better DeepWiki — Quick‑Start Guide
+# Better DeepWiki — Quick‑Start Guide
 
-> **Purpose** — Better DeepWiki is a minimalist, opinionated Rust rewrite of *deepwiki‑open*. It enriches source code with Retrieval‑Augmented Generation (RAG) so that professional developers can ask high‑fidelity questions about any Git repository.
+> **Purpose** — Better DeepWiki is a minimalist, opinionated Rust rewrite of *deepwiki‑open*. It enriches source code with Retrieval‑Augmented Generation (RAG) so that professional developers can ask high‑fidelity questions about any Git repository.
 
 ---
 
-## 1 · Prerequisites
+## 1 · Prerequisites
 
 | Tool | Recommended Version | Purpose |
 |------|---------------------|---------|
-| **Rust** | stable ≥ 1.77 | Compiles the `better-deep-wiki` binary |
-| **Node.js + npm** | ≥ 20.x | Runs the React frontend |
-| **Docker** | ≥ 24.x | Runs Qdrant (vector database) |
-| **Qdrant** | image `qdrant/qdrant` | Stores embeddings |
+| **Docker** | ≥ 24.x | Runs the entire application stack |
+| **Docker Compose** | ≥ 2.x | Orchestrates services |
 | **MistralAI API key** | — | Generates embeddings & answers |
 
 ---
 
-## 2 · Launch Qdrant Locally
-
-```bash
-docker volume create qdrant_data
-docker run \
-    -p 6333:6333 -p 6334:6334 \
-    -v qdrant_data:/qdrant/storage \
-    qdrant/qdrant
-```
-
----
-
-## 3 · Configure the Backend
+## 2 · Configuration
 
 1. Duplicate the example env file:
    ```bash
@@ -41,9 +27,9 @@ docker run \
 
 ---
 
-## 4 · Prepare the Repository to Analyse
+## 3 · Prepare the Repository to Analyse
 
-Clone (or copy) your target repository into the `clone/` directory at the project’s root:
+Clone (or copy) your target repository into the `clone/` directory at the project's root:
 
 ```bash
 git clone git@github.com:acme/repo_test.git clone/repo_test
@@ -51,25 +37,32 @@ git clone git@github.com:acme/repo_test.git clone/repo_test
 
 ---
 
-## 5 · Start the Application
+## 4 · Start the Application
 
-**Backend (Rust)**
+### **Production Mode**
 ```bash
-cargo run
+docker-compose up
 ```
 
-**Frontend (React)**
+### **Development Mode** (with hot reload)
 ```bash
-cd frontend
-npm install
-npm run dev
+docker-compose -f docker-compose.dev.yml up
 ```
+The application will be accessible at **http://localhost**
 
-The web UI is now accessible at http://localhost:5173.
+### **Architecture**
+- **Nginx Proxy**: Single entry point routing requests
+- **Frontend**: React application with Vite (hot reload in dev mode)
+- **Backend**: Rust API (hot reload in dev mode)
+- **Qdrant**: Vector database for embeddings
+- **Routes**:
+  - `/` → Frontend
+  - `/api/*` → Backend API  
+  - `/qdrant/*` → Qdrant dashboard/API
 
 ---
 
-## 6 · How to Use
+## 5 · How to Use
 
 ### **Step 1 — Index a Repository**
 
@@ -93,23 +86,23 @@ The web UI is now accessible at http://localhost:5173.
 
 ---
 
-## 7 · Troubleshooting
+## 7 · Troubleshooting
 
 | Symptom | Likely Cause |
 |---------|--------------|
-| `connection refused: 6333` | Qdrant container is not running |
+| `connection refused: 6334` | Qdrant container is not running |
 | API *rate limit* errors | Reduce usage or check your API quota |
 | Repository not listed | Ensure your repo is present in the `/clone/` directory |
 
 ---
 
-## 8 · Philosophy & Limitations
+## 8 · Philosophy & Limitations
 
-Better DeepWiki follows the *Unix philosophy*: a single, explicit workflow with minimal hidden behaviour. No internal repo cloning. One repo = one indexation.
+Better DeepWiki follows the *Unix philosophy*: a single, explicit workflow with minimal hidden behaviour. No internal repo cloning. One repo = one indexation.
 
 ---
 
-## 9 · Licence
+## 9 · Licence
 
 MIT — see `LICENSE`.
 

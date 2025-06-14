@@ -2,7 +2,7 @@ import axios from "axios";
 
 // Base axios instance
 const api = axios.create({
-  baseURL: "http://localhost:3000",
+  baseURL: "/api",
   timeout: 200000,
 });
 
@@ -42,7 +42,7 @@ export async function fetchStreamedCompletion(
   repo_identifier: string, question: string, instructions: string,
   onChunk: (text: string) => void
 ): Promise<void> {
-  const res = await fetch("http://localhost:3000/ask_repo", {
+  const res = await fetch("/api/ask_repo", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",

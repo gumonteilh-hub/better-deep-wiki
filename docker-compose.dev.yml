@@ -1,0 +1,64 @@
+services:
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: better-deep-wiki-qdrant
+    expose:
+      - "6333"
+      - "6334"
+    volumes:
+      - qdrant_data:/qdrant/storage
+
+  backend:
+    build: 
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: better-deep-wiki-backend-dev
+    expose:
+      - "3000"
+    volumes:
+      - ./src:/app/src:ro
+      - ./Cargo.toml:/app/Cargo.toml:ro
+      - ./Cargo.lock:/app/Cargo.lock:ro
+      - ./clone:/app/clone:ro
+    env_file:
+      - .env
+    environment:
+      - RUST_LOG=debug
+      - RUST_BACKTRACE=1
+    depends_on:
+      - qdrant
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    container_name: better-deep-wiki-frontend-dev
+    expose:
+      - "5173"
+    volumes:
+      - ./frontend/src:/app/src
+      - ./frontend/public:/app/public
+      - ./frontend/package.json:/app/package.json:ro
+      - ./frontend/package-lock.json:/app/package-lock.json:ro
+      - ./frontend/vite.config.ts:/app/vite.config.ts:ro
+      - ./frontend/tsconfig.json:/app/tsconfig.json:ro
+
+  proxy:
+    image: nginx:alpine
+    container_name: better-deep-wiki-proxy-dev
+    ports:
+      - "80:80"
+    volumes:
+      - ./reverse-proxy.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - backend
+      - frontend
+      - qdrant
+
+volumes:
+  qdrant_data:
+    driver: local
+
+networks:
+  default:
+    name: better-deep-wiki-network
