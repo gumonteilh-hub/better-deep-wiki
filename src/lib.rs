@@ -17,13 +17,13 @@ mod vector_store;
 
 pub use api::*;
 use tokio::sync::mpsc::Sender;
-use types::Chunk;
+use types::{Chunk, FilterConfig};
 
-pub async fn scan_repo(repo_name: String) -> String {
+pub async fn scan_repo(repo_name: String, filter_config: Option<FilterConfig>) -> String {
     let config = config::Config::from_env();
     
     println!("Start parsing repo");
-    let meta_files = parsing::parse_repo(format!("clone/{repo_name}"));
+    let meta_files = parsing::parse_repo(format!("clone/{repo_name}"), filter_config);
     println!("{} files detected.\nStart chunking", meta_files.len());
 
     let splitter = chunking::TextSplitter {

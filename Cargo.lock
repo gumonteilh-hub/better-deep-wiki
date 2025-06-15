@@ -262,6 +262,7 @@ dependencies = [
  "ignore",
  "qdrant-client",
  "rayon",
+ "regex",
  "reqwest",
  "rusqlite",
  "serde",

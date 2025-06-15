@@ -499,3 +499,124 @@ body {
   overflow-y: auto;
   min-height: 0;
 }
+
+/* Toggle Button for Filter Mode */
+.toggle-container {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  margin: 1rem 0;
+}
+
+.toggle-label {
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  font-weight: normal;
+  transition: color 0.2s ease;
+}
+
+.toggle-label.active {
+  color: var(--accent);
+  font-weight: bold;
+}
+
+.toggle-button {
+  position: relative;
+  width: 3rem;
+  height: 1.5rem;
+  background-color: var(--border);
+  border: none;
+  border-radius: 0.75rem;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+  outline: none;
+}
+
+.toggle-button:hover {
+  background-color: #444;
+}
+
+.toggle-button.toggled {
+  background-color: var(--accent);
+}
+
+.toggle-button:focus {
+  box-shadow: 0 0 0 2px var(--accent-hover);
+}
+
+.toggle-slider {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 1.25rem;
+  height: 1.25rem;
+  background-color: var(--text);
+  border-radius: 50%;
+  transition: transform 0.2s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.toggle-button.toggled .toggle-slider {
+  transform: translateX(1.5rem);
+}
+
+/* Filter section styles */
+.filter-section {
+  margin-top: 1.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--border);
+}
+
+.filter-section h2 {
+  font-size: 1rem;
+  font-weight: 500;
+  letter-spacing: 1px;
+  color: var(--text);
+  margin-bottom: 1rem;
+}
+
+.filter-paths {
+  margin-top: 1rem;
+}
+
+.filter-paths label {
+  display: block;
+  font-size: 0.9rem;
+  color: var(--text);
+  margin-bottom: 0.5rem;
+  font-weight: 500;
+}
+
+.filter-paths textarea {
+  width: 100%;
+  min-height: 8rem;
+  padding: 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background-color: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 0.85rem;
+  line-height: 1.4;
+  resize: vertical;
+  box-sizing: border-box;
+}
+
+.filter-paths textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+.filter-paths textarea::placeholder {
+  color: var(--text-muted);
+  opacity: 0.7;
+}
+
+.filter-paths small {
+  display: block;
+  margin-top: 0.5rem;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  font-style: italic;
+}

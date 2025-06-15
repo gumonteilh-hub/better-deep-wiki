@@ -66,7 +66,29 @@ The application will be accessible at **http://localhost**
 
 ### **Step 1 — Index a Repository**
 
-- On the web UI, select a repository present in `/clone/` and start the indexing process. 
+- On the web UI, select a repository present in `/clone/` and optionally configure path filters before starting the indexing process.
+
+#### **Path Filtering (Optional)**
+Configure which files to include or exclude during indexing.
+
+> **Note**: `.gitignore` rules are automatically respected, so `node_modules`, `target`, `.git`, etc. are already excluded by default.
+
+- **Exclude Mode** (default): Skip additional paths during indexing
+  - `test` — Skip files containing "test"
+  - `.test.` — Skip test files  
+  - `legacy` — Skip legacy code
+  - `vendor` — Skip vendor directories
+
+- **Include Mode**: Only index specified paths
+  - `src/` — Only index source code
+  - `docs/` — Only index documentation
+  - `.rs` — Only index Rust files
+
+**Pattern Examples:**
+- **Extensions**: `.js`, `.ts`, `.py`
+- **Directories**: `src/`, `docs/`  
+- **Contains**: `test`, `util`, `helper`
+- **Precise**: `\.test\.js$` (ends with .test.js)
 
 <p align="center">
   <img src="screenshots/indexation-exemple.png" width="700" alt="Indexation example screenshot">

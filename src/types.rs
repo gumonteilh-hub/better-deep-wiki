@@ -2,6 +2,12 @@ use bincode::{Decode, Encode};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+#[derive(Debug, Clone)]
+pub struct FilterConfig {
+    pub mode: String, // "include" or "exclude"
+    pub paths: Vec<String>,
+}
+
 #[derive(Encode, Decode, Deserialize, Serialize, Debug, Clone)]
 pub struct Chunk {
     pub path: String,

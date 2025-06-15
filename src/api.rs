@@ -13,8 +13,15 @@ use tracing::error;
 /// ═════════════════════ modèles JSON ═════════════════════
 
 #[derive(Deserialize)]
+struct FilterConfig {
+    mode: String, // "include" or "exclude"
+    paths: Vec<String>,
+}
+
+#[derive(Deserialize)]
 struct ScanRequest {
     repo_path: String,
+    filter: Option<FilterConfig>,
 }
 
 #[derive(Serialize)]
@@ -46,7 +53,12 @@ struct AppState {
 async fn scan_repo_handler(
     Json(req): Json<ScanRequest>,
 ) -> Result<Json<ScanResponse>, (StatusCode, String)> {
-    let repo_identifier = crate::scan_repo(req.repo_path.clone()).await;
+    let filter_config = req.filter.map(|f| crate::types::FilterConfig {
+        mode: f.mode,
+        paths: f.paths,
+    });
+    
+    let repo_identifier = crate::scan_repo(req.repo_path.clone(), filter_config).await;
 
     Ok(Json(ScanResponse { repo_identifier }))
 }

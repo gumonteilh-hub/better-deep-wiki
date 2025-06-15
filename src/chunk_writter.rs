@@ -11,7 +11,7 @@ pub struct ChunkBinWriter {
 
 impl ChunkBinWriter {
     pub fn create(path: &str) -> std::io::Result<Self> {
-        let file = OpenOptions::new().create(true).append(true).open(path)?;
+        let file = OpenOptions::new().create(true).write(true).truncate(true).open(path)?;
         Ok(Self {
             inner: Arc::new(Mutex::new(BufWriter::new(file))),
         })

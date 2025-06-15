@@ -7,6 +7,11 @@ const api = axios.create({
 });
 
 // Types
+export interface FilterConfig {
+  mode: "include" | "exclude";
+  paths: string[];
+}
+
 export interface ScanResponse {
   repo_identifier: string;
 }
@@ -23,9 +28,11 @@ export interface RepoListResponse {
 /**
  * Index a repository on the server
  * @param repoPath - absolute or relative path to the repo
+ * @param filterConfig - optional filter configuration for include/exclude paths
  */
-export function scanRepo(repoPath: string): Promise<ScanResponse> {
-  return api.post<ScanResponse>("/scan_repo", { repo_path: repoPath }).then((res) => res.data);
+export function scanRepo(repoPath: string, filterConfig?: FilterConfig): Promise<ScanResponse> {
+  const payload = { repo_path: repoPath, ...(filterConfig && { filter: filterConfig }) };
+  return api.post<ScanResponse>("/scan_repo", payload).then((res) => res.data);
 }
 
 /**

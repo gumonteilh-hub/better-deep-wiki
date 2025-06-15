@@ -35,17 +35,24 @@ async fn main() {
 
     match cli.command {
         Commands::Embed { repo_path } => {
-            better_deep_wiki::scan_repo(repo_path);
+            better_deep_wiki::scan_repo(repo_path, None).await;
         }
 
         Commands::Query {
             question,
             instructions,
             repo_path,
-        } => match better_deep_wiki::ask_repo(question, instructions, repo_path) {
-            Ok(answer) => println!("{answer}"),
-            Err(err) => {
-                eprintln!("❌ {err}");
+        } => {
+            let (tx, mut rx) = tokio::sync::mpsc::channel::<String>(16);
+            
+            tokio::spawn(async move {
+                if let Err(err) = better_deep_wiki::ask_repo(question, instructions, repo_path, tx).await {
+                    eprintln!("❌ {err}");
+                }
+            });
+            
+            while let Some(chunk) = rx.recv().await {
+                print!("{}", chunk);
             }
         },
     }
