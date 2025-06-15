@@ -78,10 +78,12 @@ mod tests {
         let writer = ChunkBinWriter::create(file_path).unwrap();
         let chunk = Chunk {
             path: "a".into(),
-            chunk_index: 1,
+            chunk_index: 1.to_string(),
             chunk_end_line: 5,
             chunk_start_line: 0,
             text: "yo".into(),
+            function_name: None,
+            chunk_type: crate::types::ChunkType::Class,
         };
         writer.write(&chunk).unwrap();
         writer.flush().unwrap();
@@ -90,43 +92,4 @@ mod tests {
         assert_eq!(chunk2.text, "yo");
         let _ = fs::remove_file(file_path);
     }
-
-    // #[test]
-    // fn test_threadsafe_chunkbin_v2_reader() {
-    //     let file_path = "test_thread_chunks_v2.bin";
-    //     let _ = fs::remove_file(file_path);
-    //     let writer = ChunkBinWriter::create(file_path).unwrap();
-    //     let handles: Vec<_> = (0..4)
-    //         .map(|t| {
-    //             let writer = Arc::clone(&writer);
-    //             thread::spawn(move || {
-    //                 for i in 0..10 {
-    //                     let chunk = Chunk {
-    //                         path: format!("/th{}_{}.rs", t, i),
-    //                         chunk_index: i,
-    //                         chunk_end_line: 5,
-    //                         chunk_start_line: 0,
-    //                         text: format!("x = {}", i),
-    //                     };
-    //                     writer.write(&chunk).unwrap();
-    //                 }
-    //             })
-    //         })
-    //         .collect();
-    //     for h in handles {
-    //         h.join().unwrap();
-    //     }
-    //     writer.flush().unwrap();
-
-    //     // Use the new ChunkBinReader for streaming read
-    //     let reader = ChunkBinReader::<Chunk>::open(file_path).unwrap();
-    //     let items: Vec<Chunk> = reader
-    //         .map(|r| match r {
-    //             Ok(chunk) => chunk,
-    //             Err(e) => panic!("Erreur bincode: {e:?}"),
-    //         })
-    //         .collect();
-    //     assert_eq!(items.len(), 40);
-    //     let _ = fs::remove_file(file_path);
-    // }
 }

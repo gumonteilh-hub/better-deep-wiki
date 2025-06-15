@@ -117,6 +117,8 @@ pub fn make_batches(chunks: Vec<Chunk>) -> Vec<Vec<Chunk>> {
             chunk_index: chunk.chunk_index,
             chunk_start_line: chunk.chunk_start_line,
             text: t,
+            function_name: chunk.function_name.clone(),
+            chunk_type: chunk.chunk_type.clone(),
         };
         current_batch.push(prepared_chunk);
         current_batch_tokens += n_tokens;
@@ -127,7 +129,18 @@ pub fn make_batches(chunks: Vec<Chunk>) -> Vec<Vec<Chunk>> {
     batches
 }
 
-pub fn prepare_chunk(path: &str, index: usize, text: &str) -> String {
-    format!("file: {} | {}\n\n{}", path, index, text.trim())
+pub fn prepare_chunk(mut chunk: Chunk) -> Chunk {
+    let short_path = chunk.path
+        .strip_prefix("clone/")
+        .unwrap_or(&chunk.path);
+    
+    let name = chunk.function_name
+        .as_deref()
+        .unwrap_or("anonymous");
+    
+    chunk.text = format!("[{:?}] {} @ {}:{}-{}\n{}", 
+        chunk.chunk_type, name, short_path, 
+        chunk.chunk_start_line, chunk.chunk_end_line, 
+        chunk.text.trim());
+    chunk
 }
-

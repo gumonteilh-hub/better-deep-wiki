@@ -28,6 +28,9 @@ impl VectorStore {
                 .delete_collection(collection_name)
                 .await
                 .expect("Error trying to reset collection");
+            
+            // Wait for the collection to be deleted
+            tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
         }
         client
             .create_collection(
@@ -94,7 +97,7 @@ impl VectorStore {
                 payload.insert("path".to_string(), emb.chunk.path.clone().into());
                 payload.insert(
                     "chunk_index".to_string(),
-                    (emb.chunk.chunk_index as i64).into(),
+                    (emb.chunk.chunk_index.to_string()).into(),
                 );
                 payload.insert(
                     "chunk_start_line".to_string(),
@@ -107,6 +110,14 @@ impl VectorStore {
                 payload.insert(
                     "chunk_text".to_string(),
                     (emb.chunk.text.clone() as String).into(),
+                );
+                payload.insert(
+                    "function_name".to_string(),
+                    emb.chunk.function_name.clone().unwrap_or("".to_string()).into(),
+                );
+                payload.insert(
+                    "chunk_type".to_string(),
+                    format!("{:?}", emb.chunk.chunk_type).into(),
                 );
 
                 PointStruct::new(emb.id.clone(), emb.vector.clone(), payload)
@@ -295,7 +306,7 @@ impl VectorStore {
             .get("chunk_index")
             .and_then(|v| v.kind.as_ref())
             .and_then(|kind| match kind {
-                qdrant_client::qdrant::value::Kind::IntegerValue(i) => Some(*i as usize),
+                qdrant_client::qdrant::value::Kind::StringValue(s) => Some(s.clone()),
                 _ => None,
             })
             .ok_or("Missing or invalid 'chunk_index' in payload")?;
@@ -325,14 +336,45 @@ impl VectorStore {
                 qdrant_client::qdrant::value::Kind::StringValue(s) => Some(s.clone()),
                 _ => None,
             })
-            .ok_or("Missing or invalid 'chunk_end_line' in payload")?;
+            .ok_or("Missing or invalid 'chunk_text' in payload")?;
+
+        let function_name = payload
+            .get("function_name")
+            .and_then(|v| v.kind.as_ref())
+            .and_then(|kind| match kind {
+                qdrant_client::qdrant::value::Kind::StringValue(s) => {
+                    if s.is_empty() { None } else { Some(s.clone()) }
+                },
+                _ => None,
+            });
+
+        let chunk_type = payload
+            .get("chunk_type")
+            .and_then(|v| v.kind.as_ref())
+            .and_then(|kind| match kind {
+                qdrant_client::qdrant::value::Kind::StringValue(s) => {
+                    match s.as_str() {
+                        "Function" => Some(crate::types::ChunkType::Function),
+                        "Class" => Some(crate::types::ChunkType::Class),
+                        "Method" => Some(crate::types::ChunkType::Method),
+                        "Interface" => Some(crate::types::ChunkType::Interface),
+                        "Struct" => Some(crate::types::ChunkType::Struct),
+                        "Impl" => Some(crate::types::ChunkType::Impl),
+                        "LineChunk" | _ => Some(crate::types::ChunkType::LineChunk),
+                    }
+                },
+                _ => Some(crate::types::ChunkType::LineChunk),
+            })
+            .unwrap_or(crate::types::ChunkType::LineChunk);
 
         Ok(Chunk {
             path,
-            chunk_index,
+            chunk_index: chunk_index.to_string(),
             chunk_start_line,
             chunk_end_line,
             text: chunk_text,
+            function_name,
+            chunk_type,
         })
     }
 }

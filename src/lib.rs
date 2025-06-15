@@ -9,6 +9,7 @@ mod chunk_writter;
 mod chunking;
 mod config;
 mod embedding;
+mod intelligent_chunking;
 mod parsing;
 mod types;
 mod utils;
@@ -26,7 +27,6 @@ pub async fn scan_repo(repo_name: String) -> String {
     println!("{} files detected.\nStart chunking", meta_files.len());
 
     let splitter = chunking::TextSplitter {
-        split_by: chunking::SplitBy::Line,
         chunk_size: config.chunk_size,
         chunk_overlap: config.chunk_overlap,
     };
@@ -39,7 +39,7 @@ pub async fn scan_repo(repo_name: String) -> String {
         match splitter.split_file(path) {
             Ok(chunks) => {
                 for chunk in chunks {
-                    writter.write(&chunk).unwrap();
+                    writter.write(&utils::prepare_chunk(chunk)).unwrap();
                 }
             }
             Err(e) => eprintln!("Erreur sur {:?} : {}", meta.path, e),

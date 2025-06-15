@@ -5,10 +5,23 @@ use uuid::Uuid;
 #[derive(Encode, Decode, Deserialize, Serialize, Debug, Clone)]
 pub struct Chunk {
     pub path: String,
-    pub chunk_index: usize,
+    pub chunk_index: String,
     pub chunk_start_line: usize,
     pub chunk_end_line: usize,
     pub text: String,
+    pub function_name: Option<String>,
+    pub chunk_type: ChunkType,
+}
+
+#[derive(Encode, Decode, Deserialize, Serialize, Debug, Clone)]
+pub enum ChunkType {
+    Function,
+    Class,
+    Method,
+    Interface,
+    Struct,
+    Impl,
+    LineChunk,
 }
 
 #[derive(Debug, Clone)]
