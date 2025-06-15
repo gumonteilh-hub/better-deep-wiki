@@ -10,32 +10,32 @@
 
 ---
 
-## 2️⃣ Completed – v0.3 – Graphical Interface ✅
+## 2️⃣ Completed – v0.2 – Graphical Interface ✅
 
 - HTTP API served by **axum**
 - Minimal **React** UI written in **TypeScript**: query field, answer display, highlighted context
 
 ---
 
-## 1️⃣ Completed – v0.2 – Dockerization ✅
+## 1️⃣ Completed – v0.3 – Dockerization ✅
 
 - Official lightweight container bundling the Rust binary **and an embedded Qdrant instance** for vector storage
 - One‑command deployment with `docker compose`
 
 ---
 
-## 3️⃣ v0.4 – RAG Optimisation & OpenAI Support
+## 3️⃣ Completed v0.4 – RAG Optimisation & OpenAI Support ✅
 
-- Option to use OpenAI embeddings and completions ✅
-- Improved ranking with tunable parameters ✅
-- **Explanatory schema generation at embedding time** to visualise key codebase features
+- Option to use OpenAI embeddings and completions 
+- Improved ranking with tunable parameters 
+- Semantic chunking for java js/ts and Rust
+- Hybrid search (sémantic + lexical) for better context
 
 ---
 
 ## 4️⃣ v0.5 – Sessions & Context
 
 - Session mechanism enabling **iterative queries**, carrying intermediate answers forward as context
-- Configurable TTL and memory budget
 
 ---
 
